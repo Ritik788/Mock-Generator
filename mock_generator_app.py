@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Mock Centre Generator", layout="wide")
 
-st.title("📊 Mock Centre Data Generator (Streamlit)")
+st.title("📊 Mock Centre Data Generator")
 
 # =============================
 # USER INPUTS
@@ -31,15 +31,22 @@ shift_input = st.text_input(
     "Enter shifts separated by commas",
     placeholder="Training 1, Mock 1, Mock 2"
 )
-
 shifts = [s.strip() for s in shift_input.split(",") if s.strip()]
 
 # =============================
-# FILE PATHS
+# FILE UPLOAD (NEW)
 # =============================
 
-mock_centre_file = r"C:\Users\ritik.chaudhary\Desktop\Mock Centre python.xlsx"
-desktop_path = r"C:\Users\ritik.chaudhary\Desktop"
+uploaded_file = st.file_uploader(
+    "Upload Mock Centre Excel File",
+    type=["xlsx"]
+)
+
+# =============================
+# OUTPUT FILE NAME
+# =============================
+
+desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
 
 output_name = st.text_input(
     "Enter output Excel file name",
@@ -57,23 +64,23 @@ final_mock_file = os.path.join(desktop_path, output_name)
 
 if st.button("🚀 Generate Mock Data"):
 
+    if uploaded_file is None:
+        st.error("❌ Please upload the Mock Centre Excel file")
+        st.stop()
+
     if not shifts:
         st.error("❌ Please enter at least one shift")
         st.stop()
 
-    if not os.path.exists(mock_centre_file):
-        st.error(f"❌ Mock Centre file not found:\n{mock_centre_file}")
-        st.stop()
-
-    # Load Mock Centre
-    mock_df = pd.read_excel(mock_centre_file)
+    # Load uploaded Mock Centre file
+    mock_df = pd.read_excel(uploaded_file)
 
     # Load existing FinalMock if exists
     if os.path.exists(final_mock_file):
         final_df = pd.read_excel(final_mock_file)
-        st.info("ℹ️ Existing FinalMock file found. Data will be appended.")
+        st.info("ℹ️ Existing output file found. Data will be appended.")
     else:
-        st.warning("⚠️ FinalMock file not found. A new one will be created.")
+        st.warning("⚠️ Output file not found. A new one will be created.")
         final_df = pd.DataFrame(columns=[
             "roll_no", "name", "centre_code", "centre_name",
             "city", "device_allotted", "date", "shift"
@@ -121,11 +128,10 @@ if st.button("🚀 Generate Mock Data"):
     st.write("📁 **Saved at:**", final_mock_file)
 
     st.subheader("📌 Fixed Roll Numbers Assigned")
-    roll_df = pd.DataFrame(
-        list(demo_roll_numbers.items()),
+    st.table(pd.DataFrame(
+        demo_roll_numbers.items(),
         columns=["Name", "Roll Number"]
-    )
-    st.table(roll_df)
+    ))
 
     st.subheader("👀 Preview of Generated Data")
     st.dataframe(updated_df.tail(20), use_container_width=True)
