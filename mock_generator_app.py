@@ -1,16 +1,21 @@
 import streamlit as st
 import pandas as pd
-import os
 from datetime import datetime, timedelta
+from io import BytesIO
 
-st.set_page_config(page_title="Mock Centre Generator", layout="wide")
+# =============================
+# PAGE CONFIG
+# =============================
+st.set_page_config(
+    page_title="Mock Centre Generator",
+    layout="wide"
+)
 
 st.title("📊 Mock Centre Data Generator")
 
 # =============================
 # USER INPUTS
 # =============================
-
 col1, col2 = st.columns(2)
 
 with col1:
@@ -31,12 +36,12 @@ shift_input = st.text_input(
     "Enter shifts separated by commas",
     placeholder="Training 1, Mock 1, Mock 2"
 )
+
 shifts = [s.strip() for s in shift_input.split(",") if s.strip()]
 
 # =============================
-# FILE UPLOAD (NEW)
+# FILE UPLOAD
 # =============================
-
 uploaded_file = st.file_uploader(
     "Upload Mock Centre Excel File",
     type=["xlsx"]
@@ -45,9 +50,6 @@ uploaded_file = st.file_uploader(
 # =============================
 # OUTPUT FILE NAME
 # =============================
-
-desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
-
 output_name = st.text_input(
     "Enter output Excel file name",
     value="FinalMock_Updated.xlsx"
@@ -56,12 +58,9 @@ output_name = st.text_input(
 if not output_name.lower().endswith(".xlsx"):
     output_name += ".xlsx"
 
-final_mock_file = os.path.join(desktop_path, output_name)
-
 # =============================
 # MAIN PROCESS
 # =============================
-
 if st.button("🚀 Generate Mock Data"):
 
     if uploaded_file is None:
@@ -73,29 +72,37 @@ if st.button("🚀 Generate Mock Data"):
         st.stop()
 
     # Load uploaded Mock Centre file
-    mock_df = pd.read_excel(uploaded_file)
+    try:
+        mock_df = pd.read_excel(uploaded_file)
+    except Exception as e:
+        st.error(f"❌ Failed to read Excel file: {e}")
+        st.stop()
 
-    # Load existing FinalMock if exists
-    if os.path.exists(final_mock_file):
-        final_df = pd.read_excel(final_mock_file)
-        st.info("ℹ️ Existing output file found. Data will be appended.")
-    else:
-        st.warning("⚠️ Output file not found. A new one will be created.")
-        final_df = pd.DataFrame(columns=[
-            "roll_no", "name", "centre_code", "centre_name",
-            "city", "device_allotted", "date", "shift"
-        ])
+    # Validate required columns
+    required_columns = {
+        "centre_code", "centre_name", "city", "device_allotted"
+    }
 
-    # Demo Names
+    if not required_columns.issubset(mock_df.columns):
+        st.error(
+            "❌ Uploaded file must contain columns:\n"
+            + ", ".join(required_columns)
+        )
+        st.stop()
+
+    # =============================
+    # DEMO DATA
+    # =============================
     demo_names = [f"Demo Name{i}" for i in range(1, 6)]
 
-    # Fixed Roll Numbers
     demo_roll_numbers = {
         name: str(i).zfill(roll_length)
         for i, name in enumerate(demo_names, start=1)
     }
 
-    # Generate Records
+    # =============================
+    # GENERATE DATA
+    # =============================
     new_rows = []
     base_date = datetime.combine(date_input, datetime.min.time())
 
@@ -115,17 +122,30 @@ if st.button("🚀 Generate Mock Data"):
                     "shift": shift
                 })
 
-    new_entries_df = pd.DataFrame(new_rows)
-    updated_df = pd.concat([final_df, new_entries_df], ignore_index=True)
-
-    updated_df.to_excel(final_mock_file, index=False)
+    updated_df = pd.DataFrame(new_rows)
 
     # =============================
-    # OUTPUT
+    # CREATE EXCEL IN MEMORY
     # =============================
+    output_buffer = BytesIO()
+    updated_df.to_excel(
+        output_buffer,
+        index=False,
+        engine="openpyxl"
+    )
+    output_buffer.seek(0)
 
-    st.success("✅ File generated successfully!")
-    st.write("📁 **Saved at:**", final_mock_file)
+    # =============================
+    # OUTPUT UI
+    # =============================
+    st.success("✅ Mock data generated successfully!")
+
+    st.download_button(
+        label="⬇️ Download Final Mock Excel",
+        data=output_buffer,
+        file_name=output_name,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
     st.subheader("📌 Fixed Roll Numbers Assigned")
     st.table(pd.DataFrame(
@@ -134,4 +154,4 @@ if st.button("🚀 Generate Mock Data"):
     ))
 
     st.subheader("👀 Preview of Generated Data")
-    st.dataframe(updated_df.tail(20), use_container_width=True)
+    st.dataframe(updated_df.head(50), use_container_width=True)
