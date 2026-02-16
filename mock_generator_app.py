@@ -155,4 +155,4 @@ if st.button("🚀 Generate Mock Data"):
 
     st.subheader("👀 Preview of Generated Data")
     st.dataframe(updated_df.head(50), use_container_width=True)
-    st.header("📊 Created by Ritik Chaudhary")
+st.header("📊 Created by Ritik Chaudhary")
